@@ -1,0 +1,283 @@
+@import "tailwindcss";
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbar styling for chat */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 160, 23, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 160, 23, 0.5);
+}
+
+/* Pet window: disable text selection */
+.pet-window {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* === PetSprite animations === */
+
+/* Idle: natural breathing */
+.pet-idle {
+  animation: petIdleBreathe 3s ease-in-out infinite;
+}
+
+@keyframes petIdleBreathe {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.03) translateY(-3px);
+  }
+}
+
+/* Walk: sway + bounce + shadow distance */
+.pet-walk {
+  animation: petWalkSway 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes petWalkSway {
+  0% {
+    transform: translateY(0) rotate(-4deg) scale(1);
+  }
+  100% {
+    transform: translateY(-6px) rotate(4deg) scale(1.02);
+  }
+}
+
+.pet-shadow.pet-walk {
+  animation: petWalkShadow 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes petWalkShadow {
+  0% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.7);
+    opacity: 0.12;
+  }
+}
+
+/* Click: elastic shrink-bounce */
+.pet-click {
+  animation: petClickElastic 0.2s ease-out;
+}
+
+@keyframes petClickElastic {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+/* Happy: higher jump + particles */
+.pet-happy {
+  animation: petHappyJump 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes petHappyJump {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-18px) scale(1.06);
+  }
+}
+
+.pet-shadow.pet-happy {
+  animation: petHappyShadow 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes petHappyShadow {
+  0% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0.1;
+  }
+}
+
+.pet-particle {
+  animation: petParticlePop 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes petParticlePop {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx, 0), -40px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* Type: body wiggle + cursor blink */
+.pet-type {
+  animation: petTypeWiggle 0.35s ease-in-out infinite alternate;
+}
+
+@keyframes petTypeWiggle {
+  0% {
+    transform: translateX(-2px) rotate(-2deg);
+  }
+  100% {
+    transform: translateX(2px) rotate(2deg);
+  }
+}
+
+.pet-eyes-type {
+  animation: petEyesBlink 0.25s ease-in-out infinite alternate;
+}
+
+@keyframes petEyesBlink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+.pet-type-cursor {
+  animation: petTypeCursorBlink 0.2s ease-in-out infinite alternate;
+}
+
+@keyframes petTypeCursorBlink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.15;
+  }
+}
+
+/* Sleep: flatten body + Zzz float */
+.pet-sleep {
+  animation: petSleepFlatten 3s ease-in-out infinite;
+}
+
+@keyframes petSleepFlatten {
+  0%, 100% {
+    transform: scaleY(0.9) translateY(2px);
+  }
+  50% {
+    transform: scaleY(0.88) translateY(3px);
+  }
+}
+
+.pet-zzz {
+  pointer-events: none;
+  animation: petZzzFloat 2.5s ease-in-out infinite;
+  opacity: 0;
+}
+
+.pet-zzz-1 {
+  animation-delay: 0s;
+}
+
+.pet-zzz-2 {
+  animation-delay: 0.8s;
+}
+
+.pet-zzz-3 {
+  animation-delay: 1.6s;
+}
+
+@keyframes petZzzFloat {
+  0% {
+    transform: translate(0, 0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(15px, -35px) scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* Tail wag */
+.pet-tail-wag {
+  animation: petTailWag 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes petTailWag {
+  0% {
+    transform: rotate(-12deg);
+  }
+  100% {
+    transform: rotate(12deg);
+  }
+}
+
+/* Hover: eye glow */
+.pet-hover .pet-eyes {
+  text-shadow: 0 0 8px rgba(212, 160, 23, 0.9), 0 0 16px rgba(212, 160, 23, 0.5);
+}
+
+/* === Context Menu === */
+.pet-context-menu {
+  background: #1a1a1a;
+  border: 1px solid #d4a017;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 128px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-size: 13px;
+  color: #e5e5e5;
+}
+
+.pet-menu-item {
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.pet-menu-item:hover {
+  background: rgba(212, 160, 23, 0.15);
+}
+
+.pet-menu-item-danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+}
+
+.pet-menu-divider {
+  height: 1px;
+  background: rgba(212, 160, 23, 0.25);
+  margin: 4px 8px;
+}
