@@ -1,10 +1,10 @@
-import { ipcMain, shell, dialog, IpcMainInvokeEvent, app } from 'electron';
+import { ipcMain, shell, dialog, IpcMainInvokeEvent, app, screen } from 'electron';
 import { chatWithAI, chatWithAIStream } from './ai-service';
 import { getReminders, addReminder, removeReminder, toggleReminder, parseNaturalTime } from './reminder-service';
 import { execSystemTool, discoverApps, getAppList } from './system-tools';
 import Store from 'electron-store';
 
-const store = new Store();
+const store = new Store({ projectName: 'claude-desk-pet' });
 
 export function registerIPCHandlers() {
   ipcMain.handle('ai-chat', async (_, messages: unknown[]) => {
@@ -103,5 +103,10 @@ export function registerIPCHandlers() {
   ipcMain.handle('quit-app', () => {
     app.quit();
     return true;
+  });
+
+  ipcMain.handle('get-screen-size', () => {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    return { width, height };
   });
 }

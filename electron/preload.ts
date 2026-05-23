@@ -18,6 +18,8 @@ export interface ElectronAPI {
   showContextMenu: () => void;
   sendContextMenuAction: (action: string) => void;
   onMouseAngle: (callback: (angle: number) => void) => (() => void);
+  sendTypingStatus: (isTyping: boolean) => void;
+  onTypingStatus: (callback: (isTyping: boolean) => void) => (() => void);
 }
 
 const api: ElectronAPI = {
@@ -63,6 +65,12 @@ const api: ElectronAPI = {
     const handler = (_: unknown, angle: number) => callback(angle);
     ipcRenderer.on('mouse-angle', handler);
     return () => ipcRenderer.removeListener('mouse-angle', handler);
+  },
+  sendTypingStatus: (isTyping) => ipcRenderer.send('typing-status', isTyping),
+  onTypingStatus: (callback) => {
+    const handler = (_: unknown, isTyping: boolean) => callback(isTyping);
+    ipcRenderer.on('typing-status', handler);
+    return () => ipcRenderer.removeListener('typing-status', handler);
   },
 };
 

@@ -1,16 +1,22 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePetStore } from '../stores/petStore';
 
 export function usePetBehavior() {
   const { state, setState, config } = usePetStore();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stateRef = useRef(state);
   const isPausedRef = useRef(false);
 
-  stateRef.current = state;
+  // Refs to latest values (no stale closures)
+  const stateRef = useRef(state);
+  const setStateRef = useRef(setState);
+  const activityRef = useRef(config.activityLevel);
 
-  const getActivityInterval = useCallback(() => {
-    switch (config.activityLevel) {
+  stateRef.current = state;
+  setStateRef.current = setState;
+  activityRef.current = config.activityLevel;
+
+  const getInterval = () => {
+    switch (activityRef.current) {
       case 'quiet':
         return 8000 + Math.random() * 12000;
       case 'active':
@@ -18,56 +24,46 @@ export function usePetBehavior() {
       default:
         return 4000 + Math.random() * 8000;
     }
-  }, [config.activityLevel]);
+  };
 
-  const decideNextAction = useCallback(() => {
-    if (isPausedRef.current) {
-      scheduleNext();
-      return;
-    }
-
-    if (stateRef.current === 'click' || stateRef.current === 'type' || stateRef.current === 'happy') {
-      scheduleNext();
-      return;
-    }
-
-    const rand = Math.random();
-    if (rand < 0.55) {
-      setState('idle');
-    } else {
-      setState('walk');
-      // Walk for a short duration then go back to idle
-      setTimeout(() => {
-        if (stateRef.current === 'walk') {
-          setState('idle');
-        }
-      }, 2000 + Math.random() * 3000);
-    }
-    scheduleNext();
-  }, [setState]);
-
-  const scheduleNext = useCallback(() => {
+  // Core scheduling function (captured once by the initial useEffect)
+  const schedule = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(decideNextAction, getActivityInterval());
-  }, [decideNextAction, getActivityInterval]);
+    timerRef.current = setTimeout(() => {
+      if (isPausedRef.current) {
+        schedule();
+        return;
+      }
+      if (stateRef.current === 'click' || stateRef.current === 'type' || stateRef.current === 'happy') {
+        schedule();
+        return;
+      }
+      if (stateRef.current === 'idle' && Math.random() < 0.35) {
+        setStateRef.current('walk');
+      } else if (stateRef.current === 'walk' && Math.random() < 0.6) {
+        setStateRef.current('idle');
+      }
+      schedule();
+    }, getInterval());
+  };
 
-  const resume = useCallback(() => {
-    isPausedRef.current = false;
-    scheduleNext();
-  }, [scheduleNext]);
-
-  const pause = useCallback(() => {
-    isPausedRef.current = true;
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-
-  // Init
+  // Init on mount only
   useEffect(() => {
-    scheduleNext();
+    schedule();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
+
+  const pause = () => {
+    isPausedRef.current = true;
+    if (timerRef.current) clearTimeout(timerRef.current);
+  };
+
+  const resume = () => {
+    isPausedRef.current = false;
+    schedule();
+  };
 
   return { state, resume, pause, isPaused: isPausedRef };
 }

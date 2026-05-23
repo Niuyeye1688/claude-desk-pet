@@ -16,6 +16,7 @@ interface Particle {
 const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const [lookAngle, setLookAngle] = useState(0);
+  const [failedSet, setFailedSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const cleanup = window.electronAPI?.onMouseAngle?.((angle: number) => {
@@ -37,6 +38,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
     }
     setParticles([]);
   }, [state]);
+
 
   const isSleeping = state === 'sleep';
   const isWalking = state === 'walk';
@@ -65,15 +67,34 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
   // Pupil fills most of the eye but leaves margin for movement
   const eyeW = 6 * scale;
   const eyeH = 11 * scale;
-  const pupilWidth = Math.max(3, 3.5 * scale);
-  const pupilHeight = Math.max(4, 5.5 * scale);
+  const pupilWidth = Math.max(4, 5 * scale);
+  const pupilHeight = Math.max(6, 9 * scale);
 
-  const maxDx = Math.max(0, eyeW / 2 - pupilWidth / 2);
-  const maxDy = Math.max(0, eyeH / 2 - pupilHeight / 2);
+  const maxDx = eyeW / 3;
+  const maxDy = eyeH / 3;
 
   const rad = (lookAngle * Math.PI) / 180;
   const pupilDx = Math.cos(rad) * maxDx;
   const pupilDy = Math.sin(rad) * maxDy;
+
+  const rawSrc = (() => {
+    switch (state) {
+      case 'sleep':
+        return 'pet_sleep.png';
+      case 'happy':
+        return 'pet_happy.png';
+      case 'click':
+        return 'pet_click.png';
+      case 'type':
+        return 'pet_type.png';
+      case 'walk':
+        return 'pet_walk.png';
+      default:
+        return 'pet.png';
+    }
+  })();
+
+  const petSrc = failedSet.has(rawSrc) ? 'pet.png' : rawSrc;
 
   return (
     <div
@@ -116,9 +137,17 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
         }}
       >
         <img
-          src="pet.png"
+          src={petSrc}
           alt="pet"
           draggable={false}
+          onError={() => {
+            if (rawSrc !== 'pet.png') {
+              setFailedSet((prev) => {
+                if (prev.has(rawSrc)) return prev;
+                return new Set([...prev, rawSrc]);
+              });
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',

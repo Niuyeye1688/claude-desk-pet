@@ -1,4 +1,5 @@
 import { app, ipcMain, screen } from 'electron';
+import { GlobalKeyboardListener } from 'node-global-key-listener';
 import { createPetWindow, createChatWindow, createContextMenuWindow } from './window-manager';
 import { createTray } from './tray-manager';
 import { registerIPCHandlers } from './ipc-handlers';
@@ -8,6 +9,29 @@ let petWindow: Electron.BrowserWindow | null = null;
 let chatWindow: Electron.BrowserWindow | null = null;
 let menuWindow: Electron.BrowserWindow | null = null;
 let mouseInterval: NodeJS.Timeout | null = null;
+
+// Typing state tracking
+let isChatTyping = false;
+let isGlobalTyping = false;
+let globalTypingTimer: NodeJS.Timeout | null = null;
+let gkl: GlobalKeyboardListener | null = null;
+
+const modifierKeys = new Set([
+  'LEFT CTRL', 'RIGHT CTRL',
+  'LEFT ALT', 'RIGHT ALT',
+  'LEFT SHIFT', 'RIGHT SHIFT',
+  'LEFT META', 'RIGHT META',
+  'CAPS LOCK', 'NUM LOCK', 'SCROLL LOCK',
+  'PRINT SCREEN', 'ESCAPE',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+]);
+
+function updateTypingStatus() {
+  const isTyping = isChatTyping || isGlobalTyping;
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send('typing-status', isTyping);
+  }
+}
 
 app.whenReady().then(() => {
   petWindow = createPetWindow();
@@ -28,6 +52,24 @@ app.whenReady().then(() => {
     petWindow.webContents.send('mouse-angle', angle);
   }, 100);
 
+  // Global keyboard listener for typing detection
+  gkl = new GlobalKeyboardListener();
+  gkl.addListener((e) => {
+    const name = e.name?.toUpperCase() ?? '';
+    // Ignore mouse clicks, empty names, and modifier-only keys
+    if (e.state !== 'DOWN' || !name || name.startsWith('MOUSE') || modifierKeys.has(name)) {
+      return;
+    }
+    isGlobalTyping = true;
+    updateTypingStatus();
+
+    if (globalTypingTimer) clearTimeout(globalTypingTimer);
+    globalTypingTimer = setTimeout(() => {
+      isGlobalTyping = false;
+      updateTypingStatus();
+    }, 300);
+  });
+
   // 菜单窗口失焦自动隐藏
   menuWindow.on('blur', () => {
     menuWindow?.hide();
@@ -45,6 +87,14 @@ app.on('before-quit', () => {
   if (mouseInterval) {
     clearInterval(mouseInterval);
     mouseInterval = null;
+  }
+  if (globalTypingTimer) {
+    clearTimeout(globalTypingTimer);
+    globalTypingTimer = null;
+  }
+  if (gkl) {
+    gkl.kill();
+    gkl = null;
   }
 });
 
@@ -128,6 +178,12 @@ ipcMain.on('open-reminders-panel', () => {
     chatWindow.focus();
     chatWindow.webContents.send('open-reminders');
   }
+});
+
+// Typing status from chat window (focus/blur) → merged with global keyboard
+ipcMain.on('typing-status', (_, isTyping: boolean) => {
+  isChatTyping = isTyping;
+  updateTypingStatus();
 });
 
 // Context menu window handling

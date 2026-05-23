@@ -26,7 +26,7 @@ export default defineConfig({
               fileName: () => 'main.js',
             },
             rollupOptions: {
-              external: ['electron'],
+              external: ['electron', 'node-global-key-listener'],
             },
           },
         },
@@ -47,7 +47,7 @@ export default defineConfig({
               fileName: () => 'preload.js',
             },
             rollupOptions: {
-              external: ['electron'],
+              external: ['electron', 'node-global-key-listener'],
             },
           },
         },

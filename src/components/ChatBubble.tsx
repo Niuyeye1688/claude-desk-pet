@@ -498,6 +498,8 @@ const ChatBubble: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => window.electronAPI?.sendTypingStatus?.(true)}
+          onBlur={() => window.electronAPI?.sendTypingStatus?.(false)}
           placeholder="说点什么..."
           rows={1}
           style={{

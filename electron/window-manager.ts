@@ -1,6 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 import path from 'path';
 
+const APP_ICON = path.join(__dirname, '../assets/icons/claude-extracted.ico');
+
 export function createPetWindow(): BrowserWindow {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
 
@@ -18,6 +20,7 @@ export function createPetWindow(): BrowserWindow {
     maximizable: false,
     fullscreenable: false,
     hasShadow: false,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -67,6 +70,7 @@ export function createChatWindow(petWindow: BrowserWindow): BrowserWindow {
     maximizable: false,
     fullscreenable: false,
     show: false,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -120,6 +124,7 @@ export function createContextMenuWindow(): BrowserWindow {
     fullscreenable: false,
     show: false,
     hasShadow: false,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

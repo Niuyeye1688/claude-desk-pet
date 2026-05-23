@@ -10,7 +10,7 @@ interface Reminder {
   enabled: boolean;
 }
 
-const store = new Store<{ reminders: Reminder[] }>({ defaults: { reminders: [] } });
+const store = new Store<{ reminders: Reminder[] }>({ defaults: { reminders: [] }, projectName: 'claude-desk-pet' });
 let checkInterval: ReturnType<typeof setInterval> | null = null;
 let petWindowRef: BrowserWindow | null = null;
 
