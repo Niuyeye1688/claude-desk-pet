@@ -46,11 +46,11 @@ All windows load the same `dist/index.html` and use `window.location.hash` to de
 
 **Behavior:** `src/hooks/usePetBehavior.ts` runs a random timer that switches between `idle` and `walk` states. Paused while dragging. States: `'idle' | 'walk' | 'sleep' | 'happy' | 'click' | 'type'`.
 
-**Eye tracking:** `electron/main.ts` polls `screen.getCursorScreenPoint()` every 100ms and sends the angle to the pet window. `src/components/PetSprite.tsx` computes pupil offsets mathematically and positions two absolute `div` pupils over transparent eye holes in `pet.png`. The pupils are children of the animated `.pet-body` container so they move with CSS transforms (breathing, walking, etc.).
+**Eye tracking (only pupils move, body stays still):** `electron/main.ts` polls `screen.getCursorScreenPoint()` every 100ms and sends the angle to the pet window. `src/components/PetSprite.tsx` computes pupil offsets mathematically and positions two absolute `div` pupils over transparent eye holes in `pet.png`. The pupils are children of the animated `.pet-body` container so they move with CSS transforms (breathing, walking, etc.). The body itself does NOT rotate toward the mouse; only the pupils shift within the eye sockets.
 
 **Important math:** The pet image is `150×96` but rendered inside a square container using `object-fit: contain`. Pupil positions must account for the vertical offset caused by the image's aspect ratio (`imgTopOffset`).
 
-**Current pet.png:** User-customized pixel-art character (150×96). The eyes are two `6×11` black rectangles centered at `(52.5, 34)` and `(94.5, 34)` in the original image. The eye regions are transparent; pupils overlay them.
+**Current pet.png:** User-customized pixel-art character (150×96) with an **orange/salmon body** and two **`6×11` black rectangular eyes** centered at `(52.5, 34)` and `(94.5, 34)` in the original image. The eye regions are transparent; dark `#1a1a1a` pupil divs overlay them.
 
 ### AI Service
 
@@ -82,8 +82,8 @@ The AI has a system prompt that defines a "cute desktop pet" persona. It can out
 | `src/stores/petStore.ts` | Zustand store for global state + config persistence. |
 | `src/index.css` | Tailwind import + pet animation keyframes (breathe, walk, happy, sleep, etc.). |
 | `public/pet.png` | Pet sprite image (also copied to `assets/pet.png` for the build). |
-| `assets/icons/claude-extracted.ico` | App icon (extracted from Claude Setup.exe). |
-| `assets/icons/tray.png` | Tray icon. |
+| `assets/icons/claude-extracted.ico` | App icon. Extracted from the user's `Claude Setup.exe` using Python `pefile` (multi-resolution ICO, ≥256×256 required by electron-builder). |
+| `assets/icons/tray.png` | Tray icon. Also extracted from `Claude Setup.exe`. |
 
 ## Important Decisions / Constraints
 
