@@ -1,4 +1,4 @@
-export type PetState = 'idle' | 'walk' | 'sleep' | 'happy' | 'click' | 'type';
+export type PetState = 'idle' | 'walk' | 'sleep' | 'happy' | 'click' | 'type' | 'follow';
 
 export interface PetPosition {
   x: number;

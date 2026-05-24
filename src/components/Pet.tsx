@@ -55,11 +55,34 @@ const Pet: React.FC = () => {
     return () => cleanup?.();
   }, [setState]);
 
+  // Follow: main-process driven movement toward mouse
+  useEffect(() => {
+    const cleanup = window.electronAPI?.onFollowStart?.(() => {
+      pause();
+      setState('follow');
+    });
+    return () => cleanup?.();
+  }, [pause, setState]);
+
+  useEffect(() => {
+    const cleanup = window.electronAPI?.onFollowDone?.(() => {
+      if (usePetStore.getState().state === 'follow') {
+        setState('idle');
+        if (!isTypingRef.current && !hoverRef.current) {
+          resume();
+        }
+      }
+    });
+    return () => cleanup?.();
+  }, [resume, setState]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if (!petRef.current?.contains(e.target as Node)) return;
     setIsDragging(true);
     pause();
+    setState('click');
+    window.electronAPI?.sendDragStart?.();
     dragOffset.current = {
       x: e.screenX - window.screenX,
       y: e.screenY - window.screenY,
@@ -89,6 +112,8 @@ const Pet: React.FC = () => {
   const handleMouseUp = useCallback(() => {
     if (!isDragging) return;
     setIsDragging(false);
+    setState('idle');
+    window.electronAPI?.send?.('drag-end');
     if (rafId.current !== null) {
       cancelAnimationFrame(rafId.current);
       rafId.current = null;
@@ -103,7 +128,7 @@ const Pet: React.FC = () => {
         resume();
       }
     }, 2000);
-  }, [isDragging, resume]);
+  }, [isDragging, resume, setState]);
 
   const handleDoubleClick = () => {
     setState('click');

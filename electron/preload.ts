@@ -22,6 +22,9 @@ export interface ElectronAPI {
   onTypingStatus: (callback: (isTyping: boolean) => void) => (() => void);
   startWalk: () => void;
   stopWalk: () => void;
+  sendDragStart: () => void;
+  onFollowStart: (callback: () => void) => (() => void);
+  onFollowDone: (callback: () => void) => (() => void);
 }
 
 const api: ElectronAPI = {
@@ -76,6 +79,17 @@ const api: ElectronAPI = {
   },
   startWalk: () => ipcRenderer.send('start-walk'),
   stopWalk: () => ipcRenderer.send('stop-walk'),
+  sendDragStart: () => ipcRenderer.send('drag-start'),
+  onFollowStart: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('follow-start', handler);
+    return () => ipcRenderer.removeListener('follow-start', handler);
+  },
+  onFollowDone: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('follow-done', handler);
+    return () => ipcRenderer.removeListener('follow-done', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

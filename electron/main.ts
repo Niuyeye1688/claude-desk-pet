@@ -1,4 +1,4 @@
-import { app, ipcMain, screen } from 'electron';
+import { app, ipcMain, screen, BrowserWindow } from 'electron';
 import { spawn } from 'child_process';
 import { GlobalKeyboardListener } from 'node-global-key-listener';
 import { createPetWindow, createChatWindow, createContextMenuWindow } from './window-manager';
@@ -27,6 +27,16 @@ let walkAccumY = 0;
 let walkPosX = 0;
 let walkPosY = 0;
 
+// Follow state (move toward mouse after hover)
+let followTimer: NodeJS.Timeout | null = null;
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let mouseStillSince = 0;
+const MOUSE_STILL_THRESHOLD = 10000;
+const MOUSE_STILL_RADIUS = 10;
+const FOLLOW_ARRIVAL_RADIUS = 20;
+
 const modifierKeys = new Set([
   'LEFT CTRL', 'RIGHT CTRL',
   'LEFT ALT', 'RIGHT ALT',
@@ -46,6 +56,7 @@ const modifierKeys = new Set([
 
 function updateTypingStatus() {
   const isTyping = isChatTyping || isGlobalTyping;
+  if (isTyping && followTimer) stopFollow();
   if (petWindow && !petWindow.isDestroyed()) {
     petWindow.webContents.send('typing-status', isTyping);
   }
@@ -71,15 +82,33 @@ function checkFocusIsTextInput(): Promise<boolean> {
   });
 }
 
-app.whenReady().then(() => {
-  petWindow = createPetWindow();
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (petWindow) {
+      if (petWindow.isMinimized()) petWindow.restore();
+      petWindow.show();
+      petWindow.focus();
+    }
+  });
+
+  app.whenReady().then(() => {
+  // Defensive: avoid duplicate pet window when Electron restarts in dev mode
+  const existingPet = BrowserWindow.getAllWindows().find((w) => {
+    const b = w.getBounds();
+    return b.width === 160 && b.height === 160;
+  });
+  petWindow = existingPet || createPetWindow();
   chatWindow = createChatWindow(petWindow);
   menuWindow = createContextMenuWindow();
   createTray(petWindow, chatWindow);
   registerIPCHandlers();
   startReminderCheck(petWindow);
 
-  // Send mouse angle to pet window for eye-tracking
+  // Send mouse angle to pet window for eye-tracking + mouse still detection
   mouseInterval = setInterval(() => {
     if (!petWindow || petWindow.isDestroyed()) return;
     const mouse = screen.getCursorScreenPoint();
@@ -88,6 +117,26 @@ app.whenReady().then(() => {
     const cy = bounds.y + bounds.height / 2;
     const angle = Math.atan2(mouse.y - cy, mouse.x - cx) * (180 / Math.PI);
     petWindow.webContents.send('mouse-angle', angle);
+
+    // Mouse still detection for follow
+    if (mouseStillSince === 0) {
+      lastMouseX = mouse.x;
+      lastMouseY = mouse.y;
+      mouseStillSince = Date.now();
+      return;
+    }
+    const dist = Math.hypot(mouse.x - lastMouseX, mouse.y - lastMouseY);
+    if (dist >= MOUSE_STILL_RADIUS) {
+      lastMouseX = mouse.x;
+      lastMouseY = mouse.y;
+      mouseStillSince = Date.now();
+    } else if (Date.now() - mouseStillSince >= MOUSE_STILL_THRESHOLD) {
+      if (tryStartFollow()) {
+        mouseStillSince = 0;
+      } else {
+        mouseStillSince = Date.now(); // retry after another threshold
+      }
+    }
   }, 100);
 
   // Global keyboard listener for typing detection
@@ -130,10 +179,16 @@ app.whenReady().then(() => {
   });
 
   app.on('activate', () => {
-    if (petWindow === null || petWindow.isDestroyed()) {
+    const existingPet = BrowserWindow.getAllWindows().find((w) => {
+      const b = w.getBounds();
+      return b.width === 160 && b.height === 160;
+    });
+    if (existingPet) {
+      petWindow = existingPet;
+      petWindow.show();
+    } else {
       petWindow = createPetWindow();
     }
-    petWindow.show();
   });
 });
 
@@ -189,6 +244,116 @@ function syncChatWindow() {
   });
 }
 
+function canStartFollow(): boolean {
+  if (!petWindow || petWindow.isDestroyed()) return false;
+  if (walkTimer !== null) return false;
+  if (followTimer !== null) return false;
+  if (isChatTyping || isGlobalTyping) return false;
+  if (chatWindow?.isVisible()) return false;
+  if (menuWindow?.isVisible()) return false;
+  if (isDragging) return false;
+
+  const mouse = screen.getCursorScreenPoint();
+  const bounds = petWindow.getBounds();
+  const cx = bounds.x + bounds.width / 2;
+  const cy = bounds.y + bounds.height / 2;
+  const dist = Math.hypot(mouse.x - cx, mouse.y - cy);
+  if (dist < FOLLOW_ARRIVAL_RADIUS) return false;
+
+  return true;
+}
+
+function tryStartFollow(): boolean {
+  if (!canStartFollow()) return false;
+  startFollow();
+  return true;
+}
+
+function stopFollow() {
+  if (followTimer) {
+    clearTimeout(followTimer);
+    followTimer = null;
+  }
+  if (walkChatSyncTimer) {
+    clearInterval(walkChatSyncTimer);
+    walkChatSyncTimer = null;
+  }
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send('follow-done');
+  }
+}
+
+function startFollow() {
+  if (followTimer) return;
+  if (!petWindow || petWindow.isDestroyed()) return;
+
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send('follow-start');
+  }
+
+  const b = petWindow.getBounds();
+  walkPosX = b.x;
+  walkPosY = b.y;
+
+  const STEP = 1;
+  const INTERVAL = 33;
+
+  const tick = () => {
+    if (!petWindow || petWindow.isDestroyed()) {
+      stopFollow();
+      return;
+    }
+
+    if (isChatTyping || isGlobalTyping) { stopFollow(); return; }
+    if (chatWindow?.isVisible()) { stopFollow(); return; }
+    if (menuWindow?.isVisible()) { stopFollow(); return; }
+    if (isDragging) { stopFollow(); return; }
+
+    const mouse = screen.getCursorScreenPoint();
+    const bounds = petWindow.getBounds();
+    const cx = bounds.x + bounds.width / 2;
+    const cy = bounds.y + bounds.height / 2;
+
+    const dx = mouse.x - cx;
+    const dy = mouse.y - cy;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < FOLLOW_ARRIVAL_RADIUS) {
+      stopFollow();
+      return;
+    }
+
+    const dirX = dx / dist;
+    const dirY = dy / dist;
+
+    const display = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
+    const { x: wx, y: wy, width: ww, height: wh } = display.workArea;
+
+    let newX = bounds.x + dirX * STEP;
+    let newY = bounds.y + dirY * STEP;
+
+    const maxX = wx + ww - 160;
+    const maxY = wy + wh - 160;
+
+    if (newX < wx) newX = wx;
+    if (newX > maxX) newX = maxX;
+    if (newY < wy) newY = wy;
+    if (newY > maxY) newY = maxY;
+
+    petWindow.setBounds({ x: Math.round(newX), y: Math.round(newY), width: 160, height: 160 });
+    walkPosX = newX;
+    walkPosY = newY;
+
+    followTimer = setTimeout(tick, INTERVAL);
+  };
+
+  followTimer = setTimeout(tick, INTERVAL);
+
+  walkChatSyncTimer = setInterval(() => {
+    syncChatWindow();
+  }, 100);
+}
+
 function stopWalk() {
   if (walkTimer) {
     clearTimeout(walkTimer);
@@ -202,6 +367,7 @@ function stopWalk() {
 
 function startWalk() {
   if (walkTimer) return;
+  if (followTimer) stopFollow();
   if (!petWindow || petWindow.isDestroyed()) return;
 
   let dx = (Math.random() - 0.5) * 2;
@@ -278,7 +444,17 @@ ipcMain.on('pet-move', (_, pos: { x: number; y: number }) => {
     walkPosX = pos.x;
     walkPosY = pos.y;
   }
+  if (followTimer) stopFollow();
   syncChatWindow();
+});
+
+ipcMain.on('drag-start', () => {
+  isDragging = true;
+  if (followTimer) stopFollow();
+});
+
+ipcMain.on('drag-end', () => {
+  isDragging = false;
 });
 
 ipcMain.on('start-walk', () => startWalk());
@@ -398,5 +574,7 @@ ipcMain.on('context-menu-action', (_, action: string) => {
       break;
   }
 });
+
+}
 
 export { petWindow, chatWindow, menuWindow };

@@ -41,7 +41,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
 
 
   const isSleeping = state === 'sleep';
-  const isWalking = state === 'walk';
+  const isWalking = state === 'walk' || state === 'follow';
   const isHappy = state === 'happy';
   const isClick = state === 'click';
   const isType = state === 'type';
@@ -156,7 +156,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
             display: 'block',
           }}
         />
-        {!isSleeping && (
+        {!(state === 'sleep' || state === 'happy' || state === 'click' || state === 'type') && (
           <>
             <div
               style={{

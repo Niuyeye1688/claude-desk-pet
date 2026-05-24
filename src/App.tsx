@@ -7,7 +7,7 @@ import ContextMenu from './components/ContextMenu';
 import { usePetStore } from './stores/petStore';
 
 function App() {
-  const hash = window.location.hash.slice(1) || 'pet';
+  const hash = window.location.hash.slice(1).replace(/^\//, '') || 'pet';
   const setSettingsOpen = usePetStore((s) => s.setSettingsOpen);
   const setReminderListOpen = usePetStore((s) => s.setReminderListOpen);
   const loadConfig = usePetStore((s) => s.loadConfig);
