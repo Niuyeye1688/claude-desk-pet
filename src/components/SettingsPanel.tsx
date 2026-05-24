@@ -3,6 +3,10 @@ import { usePetStore } from '../stores/petStore';
 import type { AppConfig } from '../types';
 
 const PRESET_MODELS = ['deepseek-v4-flash', 'deepseek-v4-pro'];
+const LOCAL_MODELS = ['qwen3:8b', 'qwen3-8b-small', 'qwen3-vl:4b'];
+
+const LOCAL_BASE_URL = 'http://localhost:11434/v1';
+const REMOTE_BASE_URL = 'https://api.deepseek.com';
 
 const SettingsPanel: React.FC = () => {
   const { isSettingsOpen, setSettingsOpen, config, updateConfig } = usePetStore();
@@ -37,6 +41,25 @@ const SettingsPanel: React.FC = () => {
     setSettingsOpen(false);
   };
 
+  const isLocalMode = localConfig.baseURL === LOCAL_BASE_URL;
+
+  const handleSwitchMode = (local: boolean) => {
+    if (local) {
+      setLocalConfig((prev) => ({
+        ...prev,
+        baseURL: LOCAL_BASE_URL,
+        model: LOCAL_MODELS.includes(prev.model) ? prev.model : 'qwen3-8b-small',
+        apiKey: '',
+      }));
+    } else {
+      setLocalConfig((prev) => ({
+        ...prev,
+        baseURL: REMOTE_BASE_URL,
+        model: PRESET_MODELS.includes(prev.model) ? prev.model : 'deepseek-v4-flash',
+      }));
+    }
+  };
+
   const handleClearAllData = () => {
     if (window.confirm('确定要清空所有数据吗？此操作不可恢复！')) {
       updateConfig({
@@ -46,6 +69,7 @@ const SettingsPanel: React.FC = () => {
         petSize: 120,
         activityLevel: 'normal',
         autoStart: false,
+        userProfile: '',
       });
       setLocalConfig({
         apiKey: '',
@@ -54,6 +78,7 @@ const SettingsPanel: React.FC = () => {
         petSize: 120,
         activityLevel: 'normal',
         autoStart: false,
+        userProfile: '',
       });
     }
   };
@@ -132,6 +157,34 @@ const SettingsPanel: React.FC = () => {
               AI 配置
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {([
+                  { key: 'remote', label: '在线 API' },
+                  { key: 'local', label: '本地 Ollama' },
+                ] as const).map((mode) => {
+                  const active = (mode.key === 'local') === isLocalMode;
+                  return (
+                    <button
+                      key={mode.key}
+                      onClick={() => handleSwitchMode(mode.key === 'local')}
+                      style={{
+                        flex: 1,
+                        padding: '6px 0',
+                        borderRadius: '6px',
+                        border: active ? '1px solid #d4a017' : '1px solid #444',
+                        background: active ? 'rgba(212, 160, 23, 0.15)' : '#2a2a2a',
+                        color: active ? '#d4a017' : '#999',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div>
                 <label style={{ fontSize: '12px', color: '#999', display: 'block', marginBottom: '4px' }}>
                   API Base URL
@@ -152,44 +205,46 @@ const SettingsPanel: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label style={{ fontSize: '12px', color: '#999', display: 'block', marginBottom: '4px' }}>
-                  API Key
-                </label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={localConfig.apiKey}
-                    onChange={(e) => handleChange('apiKey', e.target.value)}
-                    placeholder="sk-..."
-                    style={{
-                      flex: 1,
-                      background: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '6px',
-                      padding: '6px 10px',
-                      color: '#e0e0e0',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                  <button
-                    onClick={() => setShowKey((v) => !v)}
-                    style={{
-                      background: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '6px',
-                      padding: '6px 10px',
-                      color: '#d4a017',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {showKey ? '隐藏' : '显示'}
-                  </button>
+              {!isLocalMode && (
+                <div>
+                  <label style={{ fontSize: '12px', color: '#999', display: 'block', marginBottom: '4px' }}>
+                    API Key
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      value={localConfig.apiKey}
+                      onChange={(e) => handleChange('apiKey', e.target.value)}
+                      placeholder="sk-..."
+                      style={{
+                        flex: 1,
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        color: '#e0e0e0',
+                        fontSize: '13px',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      onClick={() => setShowKey((v) => !v)}
+                      style={{
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        color: '#d4a017',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {showKey ? '隐藏' : '显示'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div ref={modelRef} style={{ position: 'relative' }}>
                 <label style={{ fontSize: '12px', color: '#999', display: 'block', marginBottom: '4px' }}>
@@ -225,7 +280,7 @@ const SettingsPanel: React.FC = () => {
                       zIndex: 10,
                     }}
                   >
-                    {PRESET_MODELS.map((m) => (
+                    {(isLocalMode ? LOCAL_MODELS : PRESET_MODELS).map((m) => (
                       <div
                         key={m}
                         onClick={() => {

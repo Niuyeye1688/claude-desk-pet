@@ -19,7 +19,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
   const [failedSet, setFailedSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const cleanup = window.electronAPI?.onMouseAngle?.((angle: number) => {
+    const cleanup = window.electronAPI?.onMouseAngle((angle: number) => {
       setLookAngle(angle);
     });
     return () => cleanup?.();
@@ -45,6 +45,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
   const isHappy = state === 'happy';
   const isClick = state === 'click';
   const isType = state === 'type';
+  const showEyes = !(state === 'sleep' || state === 'happy' || state === 'click' || state === 'type');
 
   const getAnimationClass = () => {
     if (isWalking) return 'pet-walk';
@@ -156,7 +157,7 @@ const PetSprite: React.FC<PetSpriteProps> = ({ state, size = 120 }) => {
             display: 'block',
           }}
         />
-        {!(state === 'sleep' || state === 'happy' || state === 'click' || state === 'type') && (
+        {showEyes && (
           <>
             <div
               style={{

@@ -136,10 +136,11 @@ const MarkdownContent: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const ChatBubble: React.FC = () => {
-  const { messages, addMessage, clearMessages, setSettingsOpen, setReminderListOpen } = usePetStore();
+  const { messages, addMessage, clearMessages, setMessages, setSettingsOpen, setReminderListOpen, config, updateConfig } = usePetStore();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isCompacting = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -194,6 +195,8 @@ const ChatBubble: React.FC = () => {
       });
     } finally {
       setIsLoading(false);
+      maybeCompactMessages();
+      maybeUpdateProfile();
     }
   };
 
@@ -236,6 +239,58 @@ const ChatBubble: React.FC = () => {
       }
     }
   };
+
+  const maybeCompactMessages = useCallback(async () => {
+    if (isCompacting.current) return;
+    const currentMessages = usePetStore.getState().messages;
+    if (currentMessages.length <= 100) return;
+
+    isCompacting.current = true;
+    try {
+      const keepCount = 20;
+      const toSummarize = currentMessages.slice(0, currentMessages.length - keepCount);
+      const summaryPrompt = [
+        { role: 'system', content: '请将以下对话历史精炼成一段中文摘要，保留关键信息、用户偏好和重要上下文。尽量简短。' },
+        ...toSummarize.map((m) => ({ role: m.role, content: m.content })),
+      ];
+
+      const result = (await window.electronAPI?.invoke('ai-chat', summaryPrompt)) as AIResponse | undefined;
+      if (result && !result.error) {
+        const summaryMsg: ChatMessage = {
+          id: 'compact-' + Date.now(),
+          role: 'assistant',
+          content: '📋 历史摘要：' + result.content,
+          timestamp: Date.now(),
+        };
+        const recent = currentMessages.slice(-keepCount);
+        setMessages([summaryMsg, ...recent]);
+      }
+    } catch {
+      // 静默失败，不删除原始消息
+    } finally {
+      isCompacting.current = false;
+    }
+  }, [setMessages]);
+
+  const maybeUpdateProfile = useCallback(async () => {
+    const currentMessages = usePetStore.getState().messages;
+    const userMsgCount = currentMessages.filter((m) => m.role === 'user').length;
+    if (userMsgCount === 0 || userMsgCount % 5 !== 0) return;
+
+    const currentProfile = config.userProfile;
+    try {
+      const newProfile = (await window.electronAPI?.invoke(
+        'update-user-profile',
+        currentMessages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+        currentProfile
+      )) as string | undefined;
+      if (newProfile && newProfile !== currentProfile) {
+        updateConfig({ userProfile: newProfile });
+      }
+    } catch {
+      // ignore
+    }
+  }, [config.userProfile, updateConfig]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -498,8 +553,8 @@ const ChatBubble: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => window.electronAPI?.sendTypingStatus?.(true)}
-          onBlur={() => window.electronAPI?.sendTypingStatus?.(false)}
+          onFocus={() => window.electronAPI?.sendTypingStatus(true)}
+          onBlur={() => window.electronAPI?.sendTypingStatus(false)}
           placeholder="说点什么..."
           rows={1}
           style={{

@@ -1,5 +1,5 @@
 import { ipcMain, shell, dialog, IpcMainInvokeEvent, app, screen } from 'electron';
-import { chatWithAI, chatWithAIStream } from './ai-service';
+import { chatWithAI, chatWithAIStream, updateUserProfile } from './ai-service';
 import { getReminders, addReminder, removeReminder, toggleReminder, parseNaturalTime } from './reminder-service';
 import { execSystemTool, discoverApps, getAppList } from './system-tools';
 import Store from 'electron-store';
@@ -29,6 +29,14 @@ export function registerIPCHandlers() {
     } catch (err) {
       const e = err as Error;
       event.sender.send('ai-stream-done', { error: e.message });
+    }
+  });
+
+  ipcMain.handle('update-user-profile', async (_, messages: unknown[], currentProfile?: string) => {
+    try {
+      return await updateUserProfile(messages as Array<{ role: string; content: string }>, currentProfile);
+    } catch {
+      return currentProfile;
     }
   });
 

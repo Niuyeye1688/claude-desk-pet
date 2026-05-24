@@ -27,6 +27,7 @@ export interface AppConfig {
   petSize: number;
   activityLevel: 'quiet' | 'normal' | 'active';
   autoStart: boolean;
+  userProfile?: string;
 }
 
 export interface AIResponse {

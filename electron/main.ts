@@ -214,9 +214,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-function syncChatWindow() {
+function syncChatWindow(force = false) {
   if (!chatWindow || chatWindow.isDestroyed() || !petWindow || petWindow.isDestroyed()) return;
-  if (!chatWindow.isVisible()) return;
+  if (!force && !chatWindow.isVisible()) return;
 
   const petBounds = petWindow.getBounds();
   const display = screen.getDisplayNearestPoint({ x: petBounds.x, y: petBounds.y });
@@ -469,14 +469,23 @@ function ensureChatSize() {
   }
 }
 
+function notifyPetPanelState(isOpen: boolean) {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send(isOpen ? 'panel-open' : 'panel-close');
+  }
+}
+
 ipcMain.on('toggle-chat', (_, show: boolean) => {
   if (chatWindow) {
     ensureChatSize();
     if (show) {
+      syncChatWindow(true);
       chatWindow.show();
       chatWindow.focus();
+      notifyPetPanelState(true);
     } else {
       chatWindow.hide();
+      notifyPetPanelState(false);
     }
   }
 });
@@ -484,9 +493,11 @@ ipcMain.on('toggle-chat', (_, show: boolean) => {
 ipcMain.on('open-settings-panel', () => {
   if (chatWindow) {
     ensureChatSize();
+    syncChatWindow(true);
     chatWindow.show();
     chatWindow.focus();
     chatWindow.webContents.send('open-settings');
+    notifyPetPanelState(true);
   }
 });
 
@@ -496,6 +507,7 @@ ipcMain.on('open-reminders-panel', () => {
     chatWindow.show();
     chatWindow.focus();
     chatWindow.webContents.send('open-reminders');
+    notifyPetPanelState(true);
   }
 });
 
@@ -544,9 +556,11 @@ ipcMain.on('context-menu-action', (_, action: string) => {
         ensureChatSize();
         if (chatWindow.isVisible()) {
           chatWindow.hide();
+          notifyPetPanelState(false);
         } else {
           chatWindow.show();
           chatWindow.focus();
+          notifyPetPanelState(true);
         }
       }
       break;
@@ -557,6 +571,7 @@ ipcMain.on('context-menu-action', (_, action: string) => {
         chatWindow.show();
         chatWindow.focus();
         chatWindow.webContents.send('open-settings');
+        notifyPetPanelState(true);
       }
       break;
     }
@@ -566,6 +581,7 @@ ipcMain.on('context-menu-action', (_, action: string) => {
         chatWindow.show();
         chatWindow.focus();
         chatWindow.webContents.send('open-reminders');
+        notifyPetPanelState(true);
       }
       break;
     }

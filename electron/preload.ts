@@ -25,6 +25,8 @@ export interface ElectronAPI {
   sendDragStart: () => void;
   onFollowStart: (callback: () => void) => (() => void);
   onFollowDone: (callback: () => void) => (() => void);
+  onPanelOpen: (callback: () => void) => (() => void);
+  onPanelClose: (callback: () => void) => (() => void);
 }
 
 const api: ElectronAPI = {
@@ -89,6 +91,16 @@ const api: ElectronAPI = {
     const handler = () => callback();
     ipcRenderer.on('follow-done', handler);
     return () => ipcRenderer.removeListener('follow-done', handler);
+  },
+  onPanelOpen: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('panel-open', handler);
+    return () => ipcRenderer.removeListener('panel-open', handler);
+  },
+  onPanelClose: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('panel-close', handler);
+    return () => ipcRenderer.removeListener('panel-close', handler);
   },
 };
 

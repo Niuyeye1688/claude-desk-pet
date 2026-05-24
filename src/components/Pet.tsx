@@ -15,10 +15,11 @@ const Pet: React.FC = () => {
   const rafId = useRef<number | null>(null);
   const isTypingRef = useRef(false);
   const hoverRef = useRef(false);
+  const isPanelOpenRef = useRef(false);
 
   // Listen for typing status from main process (chat focus + global keyboard)
   useEffect(() => {
-    const cleanup = window.electronAPI?.onTypingStatus?.((isTyping: boolean) => {
+    const cleanup = window.electronAPI?.onTypingStatus((isTyping: boolean) => {
       isTypingRef.current = isTyping;
       if (isTyping) {
         pause();
@@ -35,13 +36,13 @@ const Pet: React.FC = () => {
 
   // Walk movement: delegate to main process
   useEffect(() => {
-    if (state === 'walk' && !isDragging && !isHovered) {
-      window.electronAPI?.startWalk?.();
+    if (state === 'walk' && !isDragging && !isHovered && !isPanelOpenRef.current) {
+      window.electronAPI?.startWalk();
     } else {
-      window.electronAPI?.stopWalk?.();
+      window.electronAPI?.stopWalk();
     }
     return () => {
-      window.electronAPI?.stopWalk?.();
+      window.electronAPI?.stopWalk();
     };
   }, [state, isDragging, isHovered]);
 
@@ -54,6 +55,28 @@ const Pet: React.FC = () => {
     });
     return () => cleanup?.();
   }, [setState]);
+
+  // Panel open/close → pause/resume
+  useEffect(() => {
+    const openCleanup = window.electronAPI?.onPanelOpen(() => {
+      isPanelOpenRef.current = true;
+      pause();
+      window.electronAPI?.stopWalk();
+      if (state !== 'click' && state !== 'type') {
+        setState('idle');
+      }
+    });
+    const closeCleanup = window.electronAPI?.onPanelClose(() => {
+      isPanelOpenRef.current = false;
+      if (!isTypingRef.current && !hoverRef.current) {
+        resume();
+      }
+    });
+    return () => {
+      openCleanup?.();
+      closeCleanup?.();
+    };
+  }, [pause, resume, setState, state]);
 
   // Follow: main-process driven movement toward mouse
   useEffect(() => {
@@ -68,7 +91,7 @@ const Pet: React.FC = () => {
     const cleanup = window.electronAPI?.onFollowDone?.(() => {
       if (usePetStore.getState().state === 'follow') {
         setState('idle');
-        if (!isTypingRef.current && !hoverRef.current) {
+        if (!isTypingRef.current && !hoverRef.current && !isPanelOpenRef.current) {
           resume();
         }
       }
@@ -82,7 +105,7 @@ const Pet: React.FC = () => {
     setIsDragging(true);
     pause();
     setState('click');
-    window.electronAPI?.sendDragStart?.();
+    window.electronAPI?.sendDragStart();
     dragOffset.current = {
       x: e.screenX - window.screenX,
       y: e.screenY - window.screenY,
@@ -113,7 +136,9 @@ const Pet: React.FC = () => {
     if (!isDragging) return;
     setIsDragging(false);
     setState('idle');
-    window.electronAPI?.send?.('drag-end');
+    if (window.electronAPI) {
+      window.electronAPI.send('drag-end');
+    }
     if (rafId.current !== null) {
       cancelAnimationFrame(rafId.current);
       rafId.current = null;
@@ -124,7 +149,7 @@ const Pet: React.FC = () => {
     }
     if (dragPauseTimer.current) clearTimeout(dragPauseTimer.current);
     dragPauseTimer.current = setTimeout(() => {
-      if (!isTypingRef.current && !hoverRef.current) {
+      if (!isTypingRef.current && !hoverRef.current && !isPanelOpenRef.current) {
         resume();
       }
     }, 2000);
@@ -172,7 +197,7 @@ const Pet: React.FC = () => {
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onMouseEnter={() => { setIsHovered(true); hoverRef.current = true; pause(); }}
-      onMouseLeave={() => { setIsHovered(false); hoverRef.current = false; if (!isTypingRef.current) resume(); }}
+      onMouseLeave={() => { setIsHovered(false); hoverRef.current = false; if (!isTypingRef.current && !isPanelOpenRef.current) resume(); }}
     >
       <div
         className={isHovered ? 'pet-hover' : ''}

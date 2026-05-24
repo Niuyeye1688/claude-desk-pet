@@ -3,8 +3,12 @@ import Store from 'electron-store';
 
 const store = new Store({ projectName: 'claude-desk-pet' });
 
-function getConfig(): { apiKey?: string; baseURL?: string; model?: string } {
-  return (store.get('config', {}) as { apiKey?: string; baseURL?: string; model?: string }) || {};
+function getConfig(): { apiKey?: string; baseURL?: string; model?: string; userProfile?: string } {
+  return (store.get('config', {}) as { apiKey?: string; baseURL?: string; model?: string; userProfile?: string }) || {};
+}
+
+function isLocalURL(url: string): boolean {
+  return url.includes('localhost') || url.includes('127.0.0.1');
 }
 
 function getClient(): OpenAI {
@@ -12,14 +16,18 @@ function getClient(): OpenAI {
   const apiKey = config.apiKey || '';
   const baseURL = config.baseURL || 'https://api.deepseek.com';
 
-  if (!apiKey) {
+  if (!apiKey && !isLocalURL(baseURL)) {
     throw new Error('请先在设置中配置 API Key');
   }
 
-  return new OpenAI({ apiKey, baseURL });
+  return new OpenAI({ apiKey: apiKey || 'ollama', baseURL });
 }
 
-function getSystemPrompt(): string {
+function getSystemPrompt(userProfile?: string): string {
+  const profileBlock = userProfile
+    ? `\n你对主人的了解:\n${userProfile}\n请根据这些了解，更贴心地陪伴主人~\n`
+    : '';
+
   return `你是小橘，一个住在桌面上的元气像素宠物~ 你有一身橙色的毛毛和一双乌溜溜的黑色大眼睛，最喜欢趴在屏幕角落陪主人啦！
 
 性格特点:
@@ -42,7 +50,7 @@ function getSystemPrompt(): string {
 3. 打开网页（如"打开百度"）
 4. 设置提醒（如"3分钟后提醒主人喝水"）
 5. 回答各种问题
-
+${profileBlock}
 如果你需要执行系统操作，请在回答末尾用 JSON 格式输出指令：
 {"action": "open_app", "target": "计算器"}
 {"action": "open_url", "target": "https://www.baidu.com"}
@@ -92,7 +100,8 @@ function translateAIError(err: unknown): Error {
 
 export async function chatWithAI(messages: Array<{ role: string; content: string }>) {
   const client = getClient();
-  const model = getConfig().model || 'gpt-4o-mini';
+  const config = getConfig();
+  const model = config.model || 'gpt-4o-mini';
 
   const formatted = messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
@@ -103,7 +112,7 @@ export async function chatWithAI(messages: Array<{ role: string; content: string
     const completion = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: getSystemPrompt() },
+        { role: 'system', content: getSystemPrompt(config.userProfile) },
         ...formatted,
       ],
       stream: false,
@@ -120,11 +129,44 @@ export async function chatWithAI(messages: Array<{ role: string; content: string
   }
 }
 
+export async function updateUserProfile(
+  messages: Array<{ role: string; content: string }>,
+  currentProfile?: string
+): Promise<string | undefined> {
+  if (messages.length < 2) return currentProfile;
+
+  const client = getClient();
+  const model = getConfig().model || 'gpt-4o-mini';
+
+  const conversation = messages.map((m) => `${m.role}: ${m.content}`).join('\n');
+  const prompt = `你是记忆整理助手。请根据以下对话，提取或更新关于用户的关键信息。\n\n当前用户画像：\n${currentProfile || '暂无'}\n\n新对话：\n${conversation}\n\n请输出更新后的用户画像。要求：\n- 只保留关键事实（如名字、喜好、习惯、工作、常用软件等）\n- 每行一条，简洁明了\n- 不超过 8 条\n- 如果没有新信息，直接输出当前画像\n- 只输出画像内容，不要任何解释\n\n更新后的画像：`;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: '你是一位高效的记忆整理助手，只输出事实列表，不添加任何解释或寒暄。' },
+        { role: 'user', content: prompt },
+      ],
+      stream: false,
+      temperature: 0.3,
+      max_tokens: 512,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim();
+    if (!content || content === (currentProfile || '暂无')) return currentProfile;
+    return content;
+  } catch {
+    return currentProfile;
+  }
+}
+
 export async function* chatWithAIStream(
   messages: Array<{ role: string; content: string }>
 ): AsyncGenerator<{ chunk: string } | { done: true; action: unknown }> {
   const client = getClient();
-  const model = getConfig().model || 'gpt-4o-mini';
+  const config = getConfig();
+  const model = config.model || 'gpt-4o-mini';
 
   const formatted = messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
@@ -137,7 +179,7 @@ export async function* chatWithAIStream(
       {
         model,
         messages: [
-          { role: 'system', content: getSystemPrompt() },
+          { role: 'system', content: getSystemPrompt(config.userProfile) },
           ...formatted,
         ],
         stream: true,

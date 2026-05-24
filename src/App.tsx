@@ -11,17 +11,19 @@ function App() {
   const setSettingsOpen = usePetStore((s) => s.setSettingsOpen);
   const setReminderListOpen = usePetStore((s) => s.setReminderListOpen);
   const loadConfig = usePetStore((s) => s.loadConfig);
+  const loadMessages = usePetStore((s) => s.loadMessages);
 
   useEffect(() => {
     if (hash !== 'chat') return;
     loadConfig();
+    loadMessages();
     const unsubSettings = window.electronAPI?.onOpenSettings(() => setSettingsOpen(true));
     const unsubReminders = window.electronAPI?.onOpenReminders(() => setReminderListOpen(true));
     return () => {
       unsubSettings?.();
       unsubReminders?.();
     };
-  }, [hash, setSettingsOpen, setReminderListOpen, loadConfig]);
+  }, [hash, setSettingsOpen, setReminderListOpen, loadConfig, loadMessages]);
 
   if (hash === 'chat') {
     return (

@@ -17,10 +17,12 @@ interface PetStore {
   setChatOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   setReminderListOpen: (open: boolean) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   setReminders: (reminders: Reminder[]) => void;
   loadReminders: () => Promise<void>;
   updateConfig: (cfg: Partial<AppConfig>) => void;
   loadConfig: () => Promise<void>;
+  loadMessages: () => Promise<void>;
 }
 
 export const usePetStore = create<PetStore>((set, get) => ({
@@ -38,12 +40,24 @@ export const usePetStore = create<PetStore>((set, get) => ({
     petSize: 120,
     activityLevel: 'normal',
     autoStart: false,
+    userProfile: '',
   },
 
   setState: (state) => set({ state }),
   setPosition: (position) => set({ position }),
-  addMessage: (msg) => set({ messages: [...get().messages, msg] }),
-  clearMessages: () => set({ messages: [] }),
+  addMessage: (msg) => {
+    const next = [...get().messages, msg];
+    set({ messages: next });
+    window.electronAPI?.invoke('set-config', 'messages', next);
+  },
+  clearMessages: () => {
+    set({ messages: [] });
+    window.electronAPI?.invoke('set-config', 'messages', []);
+  },
+  setMessages: (messages) => {
+    set({ messages });
+    window.electronAPI?.invoke('set-config', 'messages', messages);
+  },
   setChatOpen: (isChatOpen) => set({ isChatOpen }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
   setReminderListOpen: (isReminderListOpen) => set({ isReminderListOpen }),
@@ -69,6 +83,17 @@ export const usePetStore = create<PetStore>((set, get) => ({
       const saved = (await window.electronAPI?.invoke('get-config', 'config')) as AppConfig | undefined;
       if (saved) {
         set({ config: { ...get().config, ...saved } });
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  loadMessages: async () => {
+    try {
+      const saved = (await window.electronAPI?.invoke('get-config', 'messages')) as ChatMessage[] | undefined;
+      if (saved && Array.isArray(saved)) {
+        set({ messages: saved });
       }
     } catch {
       // ignore
