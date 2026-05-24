@@ -20,6 +20,8 @@ export interface ElectronAPI {
   onMouseAngle: (callback: (angle: number) => void) => (() => void);
   sendTypingStatus: (isTyping: boolean) => void;
   onTypingStatus: (callback: (isTyping: boolean) => void) => (() => void);
+  startWalk: () => void;
+  stopWalk: () => void;
 }
 
 const api: ElectronAPI = {
@@ -72,6 +74,8 @@ const api: ElectronAPI = {
     ipcRenderer.on('typing-status', handler);
     return () => ipcRenderer.removeListener('typing-status', handler);
   },
+  startWalk: () => ipcRenderer.send('start-walk'),
+  stopWalk: () => ipcRenderer.send('stop-walk'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

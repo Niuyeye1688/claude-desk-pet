@@ -15,8 +15,6 @@ const Pet: React.FC = () => {
   const rafId = useRef<number | null>(null);
   const isTypingRef = useRef(false);
   const hoverRef = useRef(false);
-  const walkRafId = useRef<number | null>(null);
-  const lastWalkTime = useRef(0);
 
   // Listen for typing status from main process (chat focus + global keyboard)
   useEffect(() => {
@@ -35,64 +33,15 @@ const Pet: React.FC = () => {
     };
   }, [pause, resume, setState]);
 
-  // Walk movement: slowly drift the pet window across the screen
+  // Walk movement: delegate to main process
   useEffect(() => {
-    if (state !== 'walk' || isDragging || isHovered) {
-      if (walkRafId.current !== null) {
-        cancelAnimationFrame(walkRafId.current);
-        walkRafId.current = null;
-      }
-      return;
+    if (state === 'walk' && !isDragging && !isHovered) {
+      window.electronAPI?.startWalk?.();
+    } else {
+      window.electronAPI?.stopWalk?.();
     }
-
-    const MOVE_INTERVAL = 400;
-    const MOVE_STEP = 4;
-    const PET_WINDOW_SIZE = 160;
-
-    let screenSize = { width: 1920, height: 1080 };
-    window.electronAPI?.invoke('get-screen-size').then((size: unknown) => {
-      if (size) screenSize = size as { width: number; height: number };
-    });
-
-    let walkDirX = (Math.random() - 0.5) * 2;
-    let walkDirY = (Math.random() - 0.5) * 2;
-    const len = Math.sqrt(walkDirX * walkDirX + walkDirY * walkDirY) || 1;
-    walkDirX /= len;
-    walkDirY /= len;
-
-    const tick = (time: number) => {
-      walkRafId.current = requestAnimationFrame(tick);
-      if (time - lastWalkTime.current < MOVE_INTERVAL) return;
-      lastWalkTime.current = time;
-
-      const pos = { x: window.screenX, y: window.screenY };
-      let newX = pos.x + walkDirX * MOVE_STEP;
-      let newY = pos.y + walkDirY * MOVE_STEP;
-
-      if (Math.random() < 0.02) {
-        walkDirX = (Math.random() - 0.5) * 2;
-        walkDirY = (Math.random() - 0.5) * 2;
-        const l = Math.sqrt(walkDirX * walkDirX + walkDirY * walkDirY) || 1;
-        walkDirX /= l;
-        walkDirY /= l;
-      }
-
-      const maxX = screenSize.width - PET_WINDOW_SIZE;
-      const maxY = screenSize.height - PET_WINDOW_SIZE;
-      if (newX < 0) { newX = 0; walkDirX = Math.abs(walkDirX); }
-      if (newX > maxX) { newX = maxX; walkDirX = -Math.abs(walkDirX); }
-      if (newY < 0) { newY = 0; walkDirY = Math.abs(walkDirY); }
-      if (newY > maxY) { newY = maxY; walkDirY = -Math.abs(walkDirY); }
-
-      window.electronAPI?.petMove({ x: Math.round(newX), y: Math.round(newY) });
-    };
-
-    walkRafId.current = requestAnimationFrame(tick);
     return () => {
-      if (walkRafId.current !== null) {
-        cancelAnimationFrame(walkRafId.current);
-        walkRafId.current = null;
-      }
+      window.electronAPI?.stopWalk?.();
     };
   }, [state, isDragging, isHovered]);
 

@@ -4,10 +4,10 @@
   "description": "Claude Code Desktop Pet",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "set ELECTRON_RUN_AS_NODE= && vite",
-    "build": "set ELECTRON_RUN_AS_NODE= && tsc && vite build && electron-builder",
-    "build:win": "set ELECTRON_RUN_AS_NODE= && tsc && vite build && electron-builder --win",
-    "preview": "set ELECTRON_RUN_AS_NODE= && vite preview",
+    "dev": "node scripts/run.js vite",
+    "build": "node scripts/run.js tsc && node scripts/run.js vite build && node scripts/run.js electron-builder",
+    "build:win": "node scripts/run.js tsc && node scripts/run.js vite build && node scripts/run.js electron-builder --win",
+    "preview": "node scripts/run.js vite preview",
     "postinstall": "electron-builder install-app-deps"
  },
   "keywords": [
